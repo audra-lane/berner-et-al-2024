@@ -1,0 +1,83 @@
+---
+title: "F-test"
+output: html_document
+date: "2024-02-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "~/Desktop/SBF-SEM_Mito_Data/R_F-test")
+```
+
+
+```{r}
+library(tidyverse)
+metrics <- c("area", "mci", "mbi", "sphericity", "width", "length", "volume", "perimeter")
+bartlett_pvals <- c()
+for (metric in metrics) {
+  metric_df <- read_csv(paste(metric, "_formatted.csv", sep=""), show_col_types = FALSE)
+  
+  metric_bartlett <- bartlett.test(list(metric_df$`Treatment-naive`, metric_df$`AC Residual`, metric_df$`DTX Residual`, metric_df$`CRB Residual`, metric_df$`DTX+CRB Residual`))
+  
+  bartlett_pval <- metric_bartlett$p.value
+  bartlett_pvals <- append(bartlett_pvals, bartlett_pval)
+  
+  if (bartlett_pval < 0.05) {
+    treatments <- colnames(metric_df)[2:ncol(metric_df)]
+    
+    t1s <- c()
+    t2s <- c()
+    f_pvals <- c()
+    
+    combos <- combn(treatments, 2)
+    
+    for (i in c(1:ncol(combos))) {
+      t1 <- combos[,i][1]
+      t2 <- combos[,i][2]
+      
+      t1s <- append(t1s, t1)
+      t2s <- append(t2s, t2)
+      
+      f_test <- var.test(metric_df[[t1]], metric_df[[t2]])
+      f_pval <- f_test$p.value
+      
+      f_pvals <- append(f_pvals, f_pval)
+      
+    }
+    
+    f_p_adj <- p.adjust(f_pvals, method = "holm")
+    
+    f_df <- data.frame(treatment1 = t1s, treatment2 = t2s, p = f_pvals, padj = f_p_adj)
+        
+    write.csv(f_df, paste(metric, "_f.csv"))    
+      
+  }
+  
+}
+
+bartlett_df <- data.frame(metric = metrics, p = bartlett_pvals)
+  write_csv(bartlett_df, "bartlett_results.csv")
+
+
+```
+
+```{r}
+library(tidyverse)
+metrics <- c("area", "mci", "mbi", "sphericity", "width", "length", "volume", "perimeter")
+
+variance_df <- data.frame(treatment = c("Treatment-naive", "AC Residual", "DTX Residual", "CRB Residual", "DTX+CRB Residual"))
+for (metric in metrics) {
+  metric_df <- read_csv(paste(metric, "_formatted.csv", sep=""), show_col_types = FALSE)
+  
+  treatments <- colnames(metric_df)[2:ncol(metric_df)]
+  
+  vars <- c()
+  for (treatment in treatments) {
+    vars <- append(vars, var(metric_df[[treatment]]))
+  }
+  
+  variance_df[metric] = vars
+}
+
+write_csv(variance_df, "variances.csv")
+```
+
